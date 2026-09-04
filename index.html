@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Does Artwork Change What People Click? — A Netflix-Style A/B Test</title>
+<style>
+  :root{
+    --black: #0b0b0b;
+    --panel: #171717;
+    --panel-2: #1f1f1f;
+    --red: #e50914;
+    --red-dim: #a4070f;
+    --white: #f5f5f1;
+    --gray: #b3b3b3;
+    --gray-dim: #7a7a7a;
+    --line: #2b2b2b;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin:0;
+    background: var(--black);
+    color: var(--white);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,h2,h3{
+    font-family: "Archivo", "Inter", Helvetica, Arial, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.5em 0;
+    color: var(--white);
+  }
+
+  a{ color: var(--red); }
+
+  .wrap{
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- Header / hero ---------- */
+  header.hero{
+    padding: 96px 0 72px;
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(1200px 400px at 15% -10%, rgba(229,9,20,0.16), transparent 60%),
+      var(--black);
+  }
+
+  .kicker{
+    font-size: 0.95rem;
+    color: var(--gray);
+    margin-bottom: 18px;
+  }
+
+  .kicker strong{ color: var(--white); }
+
+  h1.title{
+    font-size: clamp(2.1rem, 5vw, 3.4rem);
+    line-height: 1.08;
+    max-width: 14ch;
+  }
+
+  h1.title .accent{ color: var(--red); }
+
+  .subhead{
+    color: var(--gray);
+    font-size: 1.15rem;
+    max-width: 62ch;
+    margin-top: 18px;
+  }
+
+  .hero-meta{
+    display:flex;
+    gap: 28px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+
+  .hero-meta div{
+    border-left: 2px solid var(--red);
+    padding-left: 14px;
+  }
+
+  .hero-meta .num{
+    font-family: "Archivo", sans-serif;
+    font-size: 1.9rem;
+    font-weight: 800;
+  }
+
+  .hero-meta .label{
+    color: var(--gray-dim);
+    font-size: 0.85rem;
+  }
+
+  /* ---------- Sections ---------- */
+  section{
+    padding: 64px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  section:last-of-type{ border-bottom: none; }
+
+  h2.section-title{
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    margin-bottom: 24px;
+  }
+
+  h2.section-title .step{
+    color: var(--red);
+    margin-right: 10px;
+  }
+
+  p{ color: var(--gray); max-width: 72ch; }
+  p.lede{ color: var(--white); font-size: 1.08rem; }
+
+  ul.plain{
+    color: var(--gray);
+    padding-left: 20px;
+    max-width: 68ch;
+  }
+  ul.plain li{ margin-bottom: 10px; }
+  ul.plain strong{ color: var(--white); }
+
+  /* ---------- Step timeline ---------- */
+  .steps{
+    display: grid;
+    gap: 18px;
+    margin-top: 8px;
+  }
+
+  .step-card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--red);
+    border-radius: 4px;
+    padding: 22px 24px;
+  }
+
+  .step-card h3{
+    font-size: 1.05rem;
+    margin-bottom: 6px;
+  }
+
+  .step-card p{ margin: 0; color: var(--gray); }
+
+  /* ---------- Code blocks ---------- */
+  .code-block{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 28px 0;
+  }
+
+  .code-header{
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 18px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 0.85rem;
+    color: var(--gray);
+  }
+
+  .dots{ display:flex; gap:6px; }
+  .dots span{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .dots span:nth-child(1){ background:#e5504f; }
+  .dots span:nth-child(2){ background:#e5c04f; }
+  .dots span:nth-child(3){ background:#4fbd5f; }
+
+  pre{
+    margin: 0;
+    padding: 22px;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #e6e6e6;
+  }
+
+  pre code .c{ color:#7a8a99; }        /* comments */
+  pre code .k{ color:#e5504f; }        /* keywords */
+  pre code .s{ color:#7fbf8f; }        /* strings */
+  pre code .n{ color:#e5b04f; }        /* numbers */
+  pre code .f{ color:#6faee5; }        /* functions */
+
+  /* ---------- Results table ---------- */
+  table.results{
+    width: 100%;
+    border-collapse: collapse;
+    margin: 28px 0;
+    font-size: 0.95rem;
+  }
+
+  table.results th, table.results td{
+    border: 1px solid var(--line);
+    padding: 12px 16px;
+    text-align: left;
+  }
+
+  table.results th{
+    background: var(--panel-2);
+    color: var(--white);
+    font-weight: 700;
+  }
+
+  table.results td{ color: var(--gray); }
+  table.results tr:nth-child(2) td:first-child,
+  table.results tr:nth-child(3) td:first-child{
+    color: var(--white);
+    font-weight: 700;
+  }
+
+  .row-b td{ color: var(--white) !important; }
+
+  /* ---------- Chart ---------- */
+  .chart-card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 32px;
+    margin: 28px 0;
+  }
+
+  .chart-card h3{ font-size: 1rem; color: var(--gray); font-weight: 600; margin-bottom: 24px; }
+
+  .bar-row{
+    display:flex;
+    align-items:flex-end;
+    gap: 60px;
+    height: 260px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .bar-group{
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    flex: 1;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .bar{
+    width: 90px;
+    border-radius: 4px 4px 0 0;
+    position: relative;
+  }
+
+  .bar.a{ background: linear-gradient(180deg, #4a4a4a, #2a2a2a); }
+  .bar.b{ background: linear-gradient(180deg, var(--red), var(--red-dim)); }
+
+  .bar-value{
+    position:absolute;
+    top: -30px;
+    left: 0; right: 0;
+    text-align:center;
+    font-family:"Archivo", sans-serif;
+    font-weight: 800;
+    font-size: 1.15rem;
+  }
+
+  .bar-labels{
+    display:flex;
+    gap: 60px;
+    padding: 14px 20px 0;
+  }
+
+  .bar-labels > div{
+    flex:1;
+    text-align:center;
+    color: var(--gray);
+    font-size: 0.9rem;
+  }
+
+  .bar-labels strong{ color: var(--white); display:block; }
+
+  /* ---------- Callouts ---------- */
+  .callout{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 22px 24px;
+    margin: 24px 0;
+  }
+
+  .callout .tag{
+    display:inline-block;
+    font-size: 0.75rem;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  /* ---------- Recommendation ---------- */
+  .recommendation{
+    background: linear-gradient(180deg, rgba(229,9,20,0.10), transparent);
+    border: 1px solid var(--red-dim);
+    border-radius: 8px;
+    padding: 36px;
+    margin-top: 20px;
+  }
+
+  .recommendation h3{
+    color: var(--red);
+    font-size: 1.3rem;
+  }
+
+  .recommendation p.lede{ margin-top: 10px; }
+
+  /* ---------- Footer ---------- */
+  footer{
+    padding: 48px 0 80px;
+    text-align:center;
+    color: var(--gray-dim);
+    font-size: 0.9rem;
+  }
+
+  footer .school{
+    color: var(--gray);
+    margin-top: 6px;
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 600px){
+    header.hero{ padding: 64px 0 48px; }
+    section{ padding: 44px 0; }
+    .bar-row{ gap: 28px; }
+    .bar-labels{ gap: 28px; }
+    .bar{ width: 60px; }
+    .hero-meta{ gap: 20px; }
+    pre{ font-size: 0.78rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker"><strong>Case Study</strong> · Netflix Homepage Artwork Experiment</div>
+    <h1 class="title">Does the artwork on a title page change whether people click it<span class="accent">?</span></h1>
+    <p class="subhead">
+      A simulated, Netflix-style A/B test of two homepage artwork options, built end to end in Python —
+      from random assignment, through results, to a statistical verdict on whether the difference is real.
+    </p>
+    <div class="hero-meta">
+      <div>
+        <div class="num">1,000</div>
+        <div class="label">simulated users</div>
+      </div>
+      <div>
+        <div class="num">2</div>
+        <div class="label">artwork versions tested</div>
+      </div>
+      <div>
+        <div class="num">p = 0.022</div>
+        <div class="label">statistical result</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="context">
+  <div class="wrap">
+    <h2 class="section-title">The Netflix case, in plain English</h2>
+    <p class="lede">
+      When you open Netflix, the thumbnail image you see for a show isn't fixed — it's often chosen
+      specifically for you, from a pool of different artwork options for that same title. Netflix has
+      found that the image alone can meaningfully change whether someone clicks on a show, independent
+      of the show itself.
+    </p>
+    <p>
+      The business problem is simple to state and hard to answer with intuition alone: if you change
+      only the artwork, does more people clicking on it actually mean more people watch and enjoy the
+      content, or are you just chasing clicks? Netflix's answer has been to stop guessing and instead
+      run controlled experiments — showing different artwork to different, randomly chosen groups of
+      members, then measuring what happens.
+    </p>
+    <p>
+      That's the idea behind A/B testing, and it's a core part of how machine learning and
+      experimentation work together in industry: a model or a design choice proposes a change, and an
+      experiment tells you, with real evidence, whether that change actually moves the number you care
+      about. This project recreates a simplified version of that process from scratch.
+    </p>
+  </div>
+</section>
+
+<section id="what-i-did">
+  <div class="wrap">
+    <h2 class="section-title">What I built</h2>
+    <p>
+      I simulated a Netflix-style experiment in Python across three steps. Each step answers one
+      question in the experimentation process.
+    </p>
+    <div class="steps">
+      <div class="step-card">
+        <h3>1. Simulate the experiment</h3>
+        <p>
+          1,000 users are randomly split between two artwork versions, Artwork A and Artwork B.
+          Artwork A has a 24% true click probability and Artwork B has a 30% true click probability
+          (numbers I set deliberately, to test whether the experiment could correctly detect a known
+          difference). Each user's click is then simulated based on the version they saw, and the
+          results are stored in a table with a user ID, their assigned version, and whether they
+          clicked.
+        </p>
+      </div>
+      <div class="step-card">
+        <h3>2. Measure the results</h3>
+        <p>
+          For each version, I calculated the total number of users, the total number of clicks, and
+          the click-through rate — the percentage of people who clicked. I then built a bar chart so
+          the two rates could be compared at a glance.
+        </p>
+      </div>
+      <div class="step-card">
+        <h3>3. Test whether the difference is real</h3>
+        <p>
+          A gap between two percentages can happen purely by chance, especially with a limited sample
+          of users. I ran a statistical test — a two-proportion z-test — to check whether the gap
+          between Artwork A and Artwork B was large enough to be considered a genuine effect, rather
+          than random noise.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="code">
+  <div class="wrap">
+    <h2 class="section-title">The code</h2>
+    <p>
+      All three steps below run in a single Google Colab notebook. It generates the simulated data,
+      summarizes the results, produces the chart, and runs the significance test.
+    </p>
+    <div class="code-block">
+      <div class="code-header">
+        <span>netflix_artwork_ab_test.py</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="k">import</span> numpy <span class="k">as</span> np
+<span class="k">import</span> pandas <span class="k">as</span> pd
+<span class="k">import</span> matplotlib.pyplot <span class="k">as</span> plt
+<span class="k">from</span> statsmodels.stats.proportion <span class="k">import</span> proportions_ztest
+
+<span class="c"># Set a random seed for reproducibility</span>
+np.random.seed(<span class="n">42</span>)
+
+<span class="c"># Number of users in the experiment</span>
+n_users = <span class="n">1000</span>
+
+<span class="c"># Click probabilities for each artwork version</span>
+p_click_A = <span class="n">0.24</span>
+p_click_B = <span class="n">0.30</span>
+
+<span class="c"># Step 1: Create user IDs</span>
+user_ids = np.arange(<span class="n">1</span>, n_users + <span class="n">1</span>)
+
+<span class="c"># Step 2: Randomly assign each user to Artwork A or Artwork B (50/50 split)</span>
+artwork_assignment = np.random.choice([<span class="s">'A'</span>, <span class="s">'B'</span>], size=n_users, p=[<span class="n">0.5</span>, <span class="n">0.5</span>])
+
+<span class="c"># Step 3: Simulate whether each user clicks, based on their assigned artwork's probability</span>
+clicks = np.where(
+    artwork_assignment == <span class="s">'A'</span>,
+    np.random.binomial(<span class="n">1</span>, p_click_A, size=n_users),
+    np.random.binomial(<span class="n">1</span>, p_click_B, size=n_users)
+)
+
+<span class="c"># Step 4: Combine everything into a DataFrame</span>
+df = pd.DataFrame({
+    <span class="s">'user_id'</span>: user_ids,
+    <span class="s">'artwork_version'</span>: artwork_assignment,
+    <span class="s">'clicked'</span>: clicks
+})
+
+<span class="c"># Step 5: Calculate total users, total clicks, and click-through rate per group</span>
+summary = df.groupby(<span class="s">'artwork_version'</span>)[<span class="s">'clicked'</span>].agg(
+    total_users=<span class="s">'count'</span>,
+    total_clicks=<span class="s">'sum'</span>,
+    click_through_rate=<span class="s">'mean'</span>
+).reset_index()
+
+<span class="f">print</span>(summary)
+
+<span class="c"># Step 6: Bar chart comparing click-through rates</span>
+plt.figure(figsize=(<span class="n">6</span>, <span class="n">5</span>))
+bars = plt.bar(
+    summary[<span class="s">'artwork_version'</span>],
+    summary[<span class="s">'click_through_rate'</span>],
+    color=[<span class="s">'#E50914'</span>, <span class="s">'#221F1F'</span>],
+    width=<span class="n">0.5</span>
+)
+
+<span class="k">for</span> bar, rate <span class="k">in</span> <span class="f">zip</span>(bars, summary[<span class="s">'click_through_rate'</span>]):
+    plt.text(
+        bar.get_x() + bar.get_width() / <span class="n">2</span>,
+        bar.get_height() + <span class="n">0.005</span>,
+        <span class="f">f</span><span class="s">'{rate:.1%}'</span>,
+        ha=<span class="s">'center'</span>,
+        fontsize=<span class="n">12</span>,
+        fontweight=<span class="s">'bold'</span>
+    )
+
+plt.title(<span class="s">'Click-Through Rate by Artwork Version'</span>, fontsize=<span class="n">14</span>, fontweight=<span class="s">'bold'</span>)
+plt.xlabel(<span class="s">'Artwork Version'</span>)
+plt.ylabel(<span class="s">'Click-Through Rate'</span>)
+plt.ylim(<span class="n">0</span>, <span class="f">max</span>(summary[<span class="s">'click_through_rate'</span>]) + <span class="n">0.05</span>)
+plt.tight_layout()
+plt.show()
+
+<span class="c"># Step 7: Statistical test - two-proportion z-test</span>
+clicks_A = summary.loc[summary[<span class="s">'artwork_version'</span>] == <span class="s">'A'</span>, <span class="s">'total_clicks'</span>].values[<span class="n">0</span>]
+clicks_B = summary.loc[summary[<span class="s">'artwork_version'</span>] == <span class="s">'B'</span>, <span class="s">'total_clicks'</span>].values[<span class="n">0</span>]
+n_A = summary.loc[summary[<span class="s">'artwork_version'</span>] == <span class="s">'A'</span>, <span class="s">'total_users'</span>].values[<span class="n">0</span>]
+n_B = summary.loc[summary[<span class="s">'artwork_version'</span>] == <span class="s">'B'</span>, <span class="s">'total_users'</span>].values[<span class="n">0</span>]
+
+count = np.array([clicks_A, clicks_B])
+nobs = np.array([n_A, n_B])
+
+z_stat, p_value = proportions_ztest(count, nobs)
+
+<span class="f">print</span>(<span class="f">f</span><span class="s">"\nArtwork A: {clicks_A} clicks out of {n_A} users ({clicks_A/n_A:.2%})"</span>)
+<span class="f">print</span>(<span class="f">f</span><span class="s">"Artwork B: {clicks_B} clicks out of {n_B} users ({clicks_B/n_B:.2%})"</span>)
+<span class="f">print</span>(<span class="f">f</span><span class="s">"\nZ-statistic: {z_stat:.4f}"</span>)
+<span class="f">print</span>(<span class="f">f</span><span class="s">"P-value: {p_value:.4f}"</span>)
+
+alpha = <span class="n">0.05</span>
+<span class="k">if</span> p_value &lt; alpha:
+    <span class="f">print</span>(<span class="f">f</span><span class="s">"\nResult: p-value ({p_value:.4f}) &lt; {alpha} → The difference is statistically significant."</span>)
+    <span class="f">print</span>(<span class="s">"This suggests the difference in click-through rates is unlikely due to random chance."</span>)
+<span class="k">else</span>:
+    <span class="f">print</span>(<span class="f">f</span><span class="s">"\nResult: p-value ({p_value:.4f}) &gt;= {alpha} → The difference is NOT statistically significant."</span>)
+    <span class="f">print</span>(<span class="s">"This suggests we cannot rule out that the difference happened by random chance."</span>)
+</code></pre>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2 class="section-title">What I found</h2>
+    <p>
+      Running the simulation produced the following results. Because the group assignment is random,
+      the two groups came out close to — but not exactly — an even 500/500 split, which is expected.
+    </p>
+
+    <table class="results">
+      <thead>
+        <tr><th>Artwork Version</th><th>Users</th><th>Clicks</th><th>Click-Through Rate</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Artwork A</td><td>503</td><td>127</td><td>25.2%</td></tr>
+        <tr class="row-b"><td>Artwork B</td><td>497</td><td>158</td><td>31.8%</td></tr>
+      </tbody>
+    </table>
+
+    <div class="chart-card">
+      <h3>Click-Through Rate by Artwork Version</h3>
+      <div class="bar-row">
+        <div class="bar-group">
+          <div class="bar a" style="height: 79%;">
+            <div class="bar-value">25.2%</div>
+          </div>
+        </div>
+        <div class="bar-group">
+          <div class="bar b" style="height: 100%;">
+            <div class="bar-value">31.8%</div>
+          </div>
+        </div>
+      </div>
+      <div class="bar-labels">
+        <div><strong>Artwork A</strong>127 of 503 users</div>
+        <div><strong>Artwork B</strong>158 of 497 users</div>
+      </div>
+    </div>
+
+    <p>
+      Artwork B outperformed Artwork A by about 6.6 percentage points, roughly a 26% relative
+      improvement in click-through rate. On its own, that gap could be a real effect, or it could be
+      the kind of variation you'd expect just from randomly splitting 1,000 people into two groups. To
+      tell those apart, the difference has to be tested statistically — which is exactly what Netflix
+      does before treating any A/B test result as a real finding.
+    </p>
+
+    <div class="callout">
+      <span class="tag">STATISTICAL TEST</span>
+      <p style="margin:0; color: var(--white);">
+        A two-proportion z-test compares two percentages and asks: if there were truly no difference
+        between Artwork A and Artwork B, how likely is it that random chance alone would produce a
+        gap this large? The test returned a p-value of <strong>0.022</strong>. Since that is below the
+        standard 0.05 threshold used across the industry, the result is treated as
+        <strong>statistically significant</strong> — the evidence favors a real difference, not
+        random noise.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="recommendation">
+  <div class="wrap">
+    <h2 class="section-title">What Netflix should do</h2>
+    <p>
+      In a real version of this test, run across millions of members rather than 1,000, Netflix would
+      have far more statistical power to detect even smaller differences with confidence. Based on
+      this result, the recommended action is straightforward:
+    </p>
+
+    <div class="recommendation">
+      <h3>Roll out Artwork B</h3>
+      <p class="lede">
+        Artwork B produced a meaningfully higher click-through rate than Artwork A, and the difference
+        is unlikely to be due to chance. Netflix should adopt Artwork B as the default image for this
+        title and continue monitoring downstream engagement — such as watch time and completion rate —
+        to confirm that the extra clicks translate into more people actually watching and enjoying the
+        show, not just more clicks.
+      </p>
+    </div>
+
+    <p style="margin-top: 28px;">
+      This is the same logic that underlies Netflix's real artwork personalization system: a few
+      percentage points of click-through lift, applied across a massive member base, adds up to a
+      substantial amount of additional viewing. It's also why experimentation, not intuition, drives
+      decisions like this — a design that "feels" better isn't rolled out until the data backs it up.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>Project completed as part of <strong style="color: var(--white);">COB 320: AI in Business</strong></div>
+    <div class="school">College of Business, East Texas A&amp;M University</div>
+  </div>
+</footer>
+
+</body>
+</html>
